@@ -91,6 +91,7 @@ def updateAll(rankguess, matches, uids, alpha):
         after, diff = updateSingle(rankguess, matches, uids, i, alpha)
         newranks[i] = after
         totmove += abs(diff)
+    newranks -= numpy.sum(newranks) / float(len(newranks))
     return newranks, totmove / float(len(uids))
 
 
@@ -98,7 +99,7 @@ def getRankings(matches):
     uids = getAllUids(matches)
     rankguess = numpy.zeros(len(uids))
 
-    last = 1.0
+    last = 10.0
     alpha = 1.0
     for i in range(100):
         rankguess, move = updateAll(rankguess, matches, uids, alpha)

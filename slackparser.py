@@ -50,13 +50,16 @@ def processSubmit(args):
             p2.append(a4[2:-1])
             a4 = args.pop(0)
 
-        s1 = int(a4)
-
-        a5 = args.pop(0)
-        if a5 == '-':
+        if '-' in a4:
+            b4 = a4.split('-')
+            s1 = int(b4[0])
+            s2 = int(b4[1])
+        else:
+            s1 = int(a4)
             a5 = args.pop(0)
-
-        s2 = int(a5)
+            if a5 == '-':
+                a5 = args.pop(0)
+            s2 = int(a5)
 
         if max(s1, s2) < 10:
             return simpleResp("Someone should have scored at least 10 points!")
@@ -92,7 +95,7 @@ def formatRanking(slack, d):
         dn = [x for x in members if x['id'] == n[0]]
         if len(dn) == 1:
             name = dn[0]['name']
-        r.append("%i. %s" % (c, name))
+        r.append("%i. %s (%.1f)" % (c, name, n[1]*10.0))
 
     return r
 
@@ -136,7 +139,7 @@ def processMessage(slack, _msg):
 
         ctext = text.partition(': ')[2]
 
-        args = ctext.split(' ')
+        args = ctext.split(None)
         cmd = args[0]
 
         if cmd.lower() == 'result':
