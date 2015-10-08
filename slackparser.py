@@ -4,6 +4,8 @@ import sys
 import core
 import datetime
 import loldb
+import numpy
+import ranking
 
 
 _fooschan = 'C0BCN8XD4'
@@ -60,9 +62,17 @@ def processSubmit(args):
             if a5 == '-':
                 a5 = args.pop(0)
             s2 = int(a5)
+            if s2 < 0:
+                s2 = -s2  # Deal with case where someone writes 2 -10 by mistake
 
         if max(s1, s2) < 10:
             return simpleResp("Someone should have scored at least 10 points!")
+
+        if max(s1, s2) > 10 and abs(s2 - s1) != 2:
+            return simpleResp("Someone should have been two points ahead at the end?")
+
+        if min(s1, s2) < 0:
+            return simpleResp("")
 
         m = core.Match(p1, p2, s1, s2, datetime.datetime.now())
 
@@ -85,30 +95,123 @@ def formatRanking(slack, d):
     if not 'ok' in allusers:
         raise Exception("Couldn't get users...")
 
-    members = allusers['members']
-
     for n in sorted(d.items(), key=lambda x: x[1], reverse=True):
         if n[1] < l - 0.1:
             c += 1
             l = n[1]
-        name = n[0]
-        dn = [x for x in members if x['id'] == n[0]]
-        if len(dn) == 1:
-            name = dn[0]['name']
+        name = getNiceName(allusers, n[0])
         r.append("%i. %s (%.1f)" % (c, name, n[1]*10.0))
 
     return r
 
 
+def getNiceName(allusers, uid):
+    members = allusers['members']
+    name = uid
+    dn = [x for x in members if x['id'] == uid]
+    if len(dn) == 1:
+        name = dn[0]['name']
+    return name
+
+
+def getTimeSinceDesc(w):
+    delta = datetime.datetime.now() - w
+
+    if delta.days > 0:
+        return "%i days ago" % (delta.days)
+
+    if delta.seconds > 3600:
+        return "%i hours ago" % (delta.seconds / 3600)
+
+    if delta.seconds > 60:
+        return "%i minutes ago" % (delta.seconds / 60)
+
+    return "just now"
+
+
+def formatMatch(allusers, m):
+    nnf = lambda u: getNiceName(allusers, u)
+    part1 = ' '.join(map(nnf, m.players1))
+    part2 = ' '.join(map(nnf, m.players2))
+    tsd = getTimeSinceDesc(m.when)
+
+    return '%s vs %s %i - %i (%s)' % (part1, part2, m.score1, m.score2, tsd)
+
+
 def processRank(slack, args):
     d = loldb.getrankings()
     out = formatRanking(slack, d)
-    return map(simpleMsg, out)
+    return simpleResp('\n'.join(out))
 
 
 def processDelete(args):
     loldb.deletematch(args[0])
     return simpleResp("Match deleted!")
+
+
+def processRecent(slack, args):
+    allusers = slack.users.list().body
+    rm = loldb.getrecent(3)
+    fm = lambda m: formatMatch(allusers, m)
+    msgt = 'Last 3 games:\n' + '\n'.join(map(fm, rm))
+    return simpleResp(msgt)
+
+
+def processPredict(args):
+    d = loldb.getrankings()
+
+    players1 = []
+    while len(args) > 0 and args[0].startswith('<@'):
+        players1.append(args.pop(0)[2:-1])
+
+    if len(args) == 0:
+        return simpleResp("Was expecting a 'vs' at some point")
+
+    args.pop(0)
+
+    players2 = []
+    while len(args) > 0 and args[0].startswith('<@'):
+        players2.append(args.pop(0)[2:-1])
+
+    r1 = []
+    r2 = []
+    for p in players1:
+        if not p in d:
+            return simpleResp("I don't know the rank of <@%s>" % p)
+        r1.append(d[p])
+
+    for p in players2:
+        if not p in d:
+            return simpleResp("I don't know the rank of <@%s>" % p)
+        r2.append(d[p])
+
+    sd = numpy.mean(r2) - numpy.mean(r1)
+
+    pred = ranking.generatePrediction(sd, 10000)
+
+    line1 = "I predict team 2 has a %.0f%% chance of winning" % (pred[0]*100.0)
+    line2 = "The most likely outcome is %i - %i (%.0f%% chance)" % \
+            (pred[1][0], pred[1][1], pred[2]*100.0)
+
+    return simpleResp('\n'.join([line1, line2]))
+
+
+def processHelp(args):
+    ht = {'result': "Submit a match result\n```@foosbot: result @dave @steve vs @bob @jon 10 - 6```",
+          'rank': "See a table of player rankings based on recent results",
+          'delete': "Delete a match entered incorrectly or by mistake\n```@foosbot: delete abcdef123456```",
+          'recent': "See recently played matches",
+          'predict': "Predict a match result\n```@foosbot: predict @steve vs @dave"}
+
+    sht = 'Commands are %s and %s. For more help, type help <command>' % (', '.join(ht.keys()[:-1]), ht.keys()[-1])
+
+    if len(args) == 0:
+        return simpleResp(sht)
+    else:
+        if args[0] in ht:
+            return simpleResp(ht[args[0]])
+        else:
+            return simpleResp("Sorry, I don't know about %s" % args[0])
 
 
 def processMessage(slack, _msg):
@@ -130,14 +233,19 @@ def processMessage(slack, _msg):
             return []
 
         print "INCHANNEL"
+
+        if not 'text' in msg:
+            print "Ignoring possible edit?"
+            return []
+
         text = msg['text']
 
         print text
 
-        if not text.startswith('<@U0BCNAB3P>: '):
+        if not text.startswith('<@U0BCNAB3P>'):
             return []
 
-        ctext = text.partition(': ')[2]
+        ctext = text.partition(' ')[2]
 
         args = ctext.split(None)
         cmd = args[0]
@@ -148,6 +256,12 @@ def processMessage(slack, _msg):
             return processRank(slack, args[1:])
         elif cmd.lower().startswith('delete'):
             return processDelete(args[1:])
+        elif cmd.lower().startswith('recent'):
+            return processRecent(slack, args[1:])
+        elif cmd.lower().startswith('help'):
+            return processHelp(args[1:])
+        elif cmd.lower().startswith('predict'):
+            return processPredict(args[1:])
         else:
             return simpleResp("I didn't understand the command %s" % (cmd))
 

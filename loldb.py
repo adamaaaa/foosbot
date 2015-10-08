@@ -32,8 +32,20 @@ def getrankings():
     return ranking.getRankings(_getdb()['matches'].values())
 
 
+def getrecent(n=3):
+    return sorted(_getdb()['matches'].values(),
+                  key=lambda x: x.when, reverse=True)[:n]
+
+
+def _newid():
+    return ''.join(numpy.random.choice(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'], 8))
+
+
 def addmatch(m):
-    mid = ''.join(numpy.random.choice(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'], 16))
+    mid = None
+    while mid is None or mid in _getdb()['matches']:
+        mid = _newid()
+
     _getdb()['matches'][mid] = m
     _commitback()
     return mid

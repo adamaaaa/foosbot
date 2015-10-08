@@ -1,4 +1,7 @@
 import numpy
+import math
+import collections
+import datetime
 
 diffest = {1: 0.1,  # Note this top number was made up...
            2: 0.20910457648873165,
@@ -63,14 +66,17 @@ def getRankShift(rankguess, m, uids, u):
         raise Exception("User didn't play?")
 
 
-def updateSingle(rankguess, matches, uids, i, alpha):
+def updateSingle(rankguess, matches, uids, i, alpha, now):
     u = uids[i]
     goal = 0.0
     count = 0
     for m in matches:
         if u in m.players1 or u in m.players2:
-            goal += getRankShift(rankguess, m, uids, u)
-            count += 1
+            td = (now - m.when).total_seconds()
+            tw = math.exp(-td/(60.0*60.0*24.0*7.0))  # Does this work??? Or does weird stuff happen as time goes on
+            # print tw
+            goal += tw*getRankShift(rankguess, m, uids, u)
+            count += tw
 
     if count == 0:
         return 0.0
@@ -84,11 +90,11 @@ def updateSingle(rankguess, matches, uids, i, alpha):
     return after, diff
 
 
-def updateAll(rankguess, matches, uids, alpha):
+def updateAll(rankguess, matches, uids, alpha, now):
     totmove = 0.0
     newranks = numpy.zeros_like(rankguess)
     for i in range(len(uids)):
-        after, diff = updateSingle(rankguess, matches, uids, i, alpha)
+        after, diff = updateSingle(rankguess, matches, uids, i, alpha, now)
         newranks[i] = after
         totmove += abs(diff)
     newranks -= numpy.sum(newranks) / float(len(newranks))
@@ -101,8 +107,9 @@ def getRankings(matches):
 
     last = 10.0
     alpha = 1.0
+    now = datetime.datetime.now()
     for i in range(100):
-        rankguess, move = updateAll(rankguess, matches, uids, alpha)
+        rankguess, move = updateAll(rankguess, matches, uids, alpha, now)
         print alpha, move
         if move > last * 0.999:
             alpha /= 2.0
@@ -111,3 +118,24 @@ def getRankings(matches):
         last = move
 
     return {k: v for k, v in zip(uids, rankguess)}
+
+
+def _generateGame(sd):
+    s = [0, 0]
+    esd = math.exp(sd)
+    p = esd/(esd+1)
+    while True:
+        n = numpy.random.binomial(1, p)
+        s[n] += 1
+
+        if max(s) > 9:
+            if abs(s[0] - s[1]) > 1:
+                return s[0], s[1]
+
+
+def generatePrediction(sd, n):
+    d = [_generateGame(sd) for i in range(n)]
+    wins = numpy.sum(map(lambda x: x[1] > x[0], d))
+    mp = sorted(collections.Counter(d).items(),
+                key=lambda x: x[1], reverse=True)
+    return wins / float(n), mp[0][0], mp[0][1] / float(n)
