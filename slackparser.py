@@ -85,10 +85,19 @@ def processSubmit(args):
         return simpleResp("I'm sorry I didn't understand that")
 
 
-def formatRanking(slack, d):
+def mangleit(x, iseq):
+    c = '.'
+    if x[0] in iseq:
+        c = '='
+    return "%i%s %s" % (x[0], c, x[1])
+
+
+def formatRanking(slack, d, mc):
     r = []
     l = 1e6
     c = 0
+    tc = 0
+    iseq = []
 
     allusers = slack.users.list().body
 
@@ -96,11 +105,19 @@ def formatRanking(slack, d):
         raise Exception("Couldn't get users...")
 
     for n in sorted(d.items(), key=lambda x: x[1], reverse=True):
+        tc += 1
         if n[1] < l - 0.1:
-            c += 1
+            c = tc
             l = n[1]
+        else:
+            iseq.append(c)
         name = getNiceName(allusers, n[0])
-        r.append("%i. %s (%.1f)" % (c, name, n[1]*10.0))
+        ss = "%.1f" % (10.0 + (n[1]*10.0))
+        if mc[n[0]] < 3:
+            ss = '*'
+        r.append((c, "%s (%s)" % (name, ss)))
+
+    r = map(lambda x: mangleit(x, iseq), r)
 
     return r
 
@@ -139,9 +156,14 @@ def formatMatch(allusers, m):
 
 
 def processRank(slack, args):
-    d = loldb.getrankings()
-    out = formatRanking(slack, d)
-    return simpleResp('\n'.join(out))
+    m = loldb.getmatches()
+    d = ranking.getRankings(m)
+    mc = ranking.countGames(m)
+    out = formatRanking(slack, d, mc)
+    legstr = ''
+    if numpy.min(mc.values()) < 3:
+        legstr = '\n* has played less than 3 games'
+    return simpleResp('```' + '\n'.join(out) + legstr + '```')
 
 
 def processDelete(args):
@@ -201,7 +223,7 @@ def processHelp(args):
           'rank': "See a table of player rankings based on recent results",
           'delete': "Delete a match entered incorrectly or by mistake\n```@foosbot: delete abcdef123456```",
           'recent': "See recently played matches",
-          'predict': "Predict a match result\n```@foosbot: predict @steve vs @dave"}
+          'predict': "Predict a match result\n```@foosbot: predict @steve vs @dave```"}
 
     sht = 'Commands are %s and %s. For more help, type help <command>' % (', '.join(ht.keys()[:-1]), ht.keys()[-1])
 
@@ -248,6 +270,9 @@ def processMessage(slack, _msg):
         ctext = text.partition(' ')[2]
 
         args = ctext.split(None)
+        if not args:
+            return simpleResp("You didn't ask me to do anything!")
+
         cmd = args[0]
 
         if cmd.lower() == 'result':

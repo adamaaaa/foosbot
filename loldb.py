@@ -32,6 +32,10 @@ def getrankings():
     return ranking.getRankings(_getdb()['matches'].values())
 
 
+def getmatches():
+    return _getdb()['matches'].values()
+
+
 def getrecent(n=3):
     return sorted(_getdb()['matches'].values(),
                   key=lambda x: x.when, reverse=True)[:n]
