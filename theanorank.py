@@ -5,12 +5,7 @@ import math
 import numpy
 
 
-def getAllUids(matches):
-    allu = [m.players1 + m.players2 for m in matches]
-    return list(set([x for y in allu for x in y]))
-
-
-def getRanking(matches):
+def _getModel():
     s1, s2 = T.dvectors('s1', 's2')
     t1, t2 = T.dmatrices('t1', 't2')
     gw = T.dvector('gw')
@@ -28,7 +23,30 @@ def getRanking(matches):
 
     gradf = T.grad(logl, prank)
 
+    return s1, s2, t1, t2, gw, prank, loglterms, logl, gradf
+
+
+_modelcache = None
+
+
+def getModel():
+    global _modelcache
+    if _modelcache is None:
+        _modelcache = _getModel()
+
+    return _modelcache
+
+
+def getAllUids(matches):
+    allu = [m.players1 + m.players2 for m in matches]
+    return list(set([x for y in allu for x in y]))
+
+
+def getRanking(matches):
+
     uids = getAllUids(matches)
+
+    s1, s2, t1, t2, gw, prank, loglterms, logl, gradf = getModel()
 
     s1_r = numpy.zeros(len(matches))
     s2_r = numpy.zeros(len(matches))

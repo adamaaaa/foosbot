@@ -6,6 +6,7 @@ import datetime
 import loldb
 import numpy
 import ranking
+import theanorank
 
 
 _fooschan = 'C0BCN8XD4'
@@ -157,9 +158,12 @@ def formatMatch(allusers, m):
 
 def processRank(slack, args):
     m = loldb.getmatches()
-    d = ranking.getRankings(m)
+    # d = ranking.getRankings(m)
+    td = theanorank.getRanking(m)
+    # print d
+    print td
     mc = ranking.countGames(m)
-    out = formatRanking(slack, d, mc)
+    out = formatRanking(slack, td, mc)
     legstr = ''
     if numpy.min(mc.values()) < 3:
         legstr = '\n* has played less than 3 games'
