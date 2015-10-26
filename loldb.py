@@ -1,6 +1,7 @@
 import pickle
 import ranking
 import numpy
+import collections
 
 
 _dbfile = 'foosdb.pickle'
@@ -39,6 +40,24 @@ def getmatches():
 def getrecent(n=3):
     return sorted(_getdb()['matches'].values(),
                   key=lambda x: x.when, reverse=True)[:n]
+
+
+def getgamecounts():
+    matches = getmatches()
+    r = collections.defaultdict(int)
+    for m in matches:
+        for p in m.players1 + m.players2:
+            r[p] += 1
+    return r
+
+
+def getlastgame(uid):
+    matches = getmatches()
+    times = []
+    for m in matches:
+        if uid in m.players1 + m.players2:
+            times.append(m)
+    return sorted(times, key=lambda x: x.when)[-1]
 
 
 def _newid():

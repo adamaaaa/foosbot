@@ -101,14 +101,6 @@ def updateAll(rankguess, matches, uids, alpha, now):
     return newranks, totmove / float(len(uids))
 
 
-def countGames(matches):
-    r = collections.defaultdict(int)
-    for m in matches:
-        for p in m.players1 + m.players2:
-            r[p] += 1
-    return r
-
-
 def getRankings(matches):
     uids = getAllUids(matches)
     rankguess = numpy.zeros(len(uids))

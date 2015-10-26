@@ -100,19 +100,22 @@ def formatRanking(slack, d, mc):
     tc = 0
     iseq = []
 
+    notyet = []
+
     allusers = slack.users.list().body
 
     if not 'ok' in allusers:
         raise Exception("Couldn't get users...")
 
     for n in sorted(d.items(), key=lambda x: x[1], reverse=True):
+        name = getNiceName(allusers, n[0])
+
         tc += 1
         if n[1] < l - 0.1:
             c = tc
             l = n[1]
         else:
             iseq.append(c)
-        name = getNiceName(allusers, n[0])
         ss = "%.1f" % (10.0 + (n[1]*10.0))
         if mc[n[0]] < 3:
             ss = '*'
@@ -162,7 +165,7 @@ def processRank(slack, args):
     td = theanorank.getRanking(m)
     # print d
     print td
-    mc = ranking.countGames(m)
+    mc = loldb.getgamecounts()
     out = formatRanking(slack, td, mc)
     legstr = ''
     if numpy.min(mc.values()) < 3:
@@ -183,8 +186,49 @@ def processRecent(slack, args):
     return simpleResp(msgt)
 
 
+def processStats(slack, args, user):
+    if len(args) == 0:
+        uid = user
+    elif len(args) != 1:
+        return simpleResp("I don't understand...")
+    else:
+        if not args[0].startswith("<@"):
+            return simpleResp("I don't know who %s is" % (args[0]))
+
+        uid = args[0][2:-1]
+
+    print "Stats UID: %s" % (uid)
+
+    allusers = slack.users.list().body
+
+    m = loldb.getmatches()
+    mc = loldb.getgamecounts()[uid]
+    lg = loldb.getlastgame(uid)
+    td = theanorank.getRanking(m)
+    bw = theanorank.getBestWorst(m, uid)
+
+    nn = getNiceName(allusers, uid)
+
+    r1t = "Stats for %s" % nn
+    div = '-' * (len(r1t))
+    r1ta = "Skill level: %.1f" % (10.0 + (10.0 * td[uid]))
+    r2t = "Matches played: %i" % (mc)
+    r2ta = "Last match: %s" % (formatMatch(allusers, lg))
+
+    allt = [r1t, div, r1ta, r2t, r2ta]
+
+    if mc > 1:
+        r3t = "Best recent match: %s" % (formatMatch(allusers, bw[-1][1]))
+        r4t = "Worst recent match: %s" % (formatMatch(allusers, bw[0][1]))
+        allt.append(r3t)
+        allt.append(r4t)
+
+    return simpleResp('```' + '\n'.join(allt) + '```')
+
+
 def processPredict(args):
-    d = loldb.getrankings()
+    m = loldb.getmatches()
+    d = theanorank.getRanking(m)
 
     players1 = []
     while len(args) > 0 and args[0].startswith('<@'):
@@ -227,7 +271,8 @@ def processHelp(args):
           'rank': "See a table of player rankings based on recent results",
           'delete': "Delete a match entered incorrectly or by mistake\n```@foosbot: delete abcdef123456```",
           'recent': "See recently played matches",
-          'predict': "Predict a match result\n```@foosbot: predict @steve vs @dave```"}
+          'predict': "Predict a match result\n```@foosbot: predict @steve vs @dave```",
+          'stats': "Get player stats\n```@foosbot: stats @dave```"}
 
     sht = 'Commands are %s and %s. For more help, type help <command>' % (', '.join(ht.keys()[:-1]), ht.keys()[-1])
 
@@ -265,6 +310,10 @@ def processMessage(slack, _msg):
             return []
 
         text = msg['text']
+        user = 'UNKNOWN'
+
+        if 'user' in msg:
+            user = msg['user']
 
         print text
 
@@ -291,6 +340,8 @@ def processMessage(slack, _msg):
             return processHelp(args[1:])
         elif cmd.lower().startswith('predict'):
             return processPredict(args[1:])
+        elif cmd.lower().startswith('stat'):
+            return processStats(slack, args[1:], user)
         else:
             return simpleResp("I didn't understand the command %s" % (cmd))
 

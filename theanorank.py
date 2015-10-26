@@ -42,12 +42,7 @@ def getAllUids(matches):
     return list(set([x for y in allu for x in y]))
 
 
-def getRanking(matches):
-
-    uids = getAllUids(matches)
-
-    s1, s2, t1, t2, gw, prank, loglterms, logl, gradf = getModel()
-
+def buildMatrices(matches, uids):
     s1_r = numpy.zeros(len(matches))
     s2_r = numpy.zeros(len(matches))
     t1_r = numpy.zeros((len(matches), len(uids)))
@@ -70,6 +65,15 @@ def getRanking(matches):
         for p in p2:
             t2_r[i][uids.index(p)] = 1.0/len(p2)
 
+    return s1_r, s2_r, t1_r, t2_r, gw_r
+
+
+def getRankingRaw(matches, uids):
+
+    s1, s2, t1, t2, gw, prank, loglterms, logl, gradf = getModel()
+
+    s1_r, s2_r, t1_r, t2_r, gw_r = buildMatrices(matches, uids)
+
     prank_r = numpy.array(numpy.random.normal(0.0, 0.01, len(uids)))
     last = 1e100
     alpha = 0.25
@@ -89,4 +93,32 @@ def getRanking(matches):
         if i % 100 == 0:
             print i, prank_r[:2], prev[:2], score, alpha
 
+    return prank_r
+
+
+def getRanking(matches):
+
+    uids = getAllUids(matches)
+    prank_r = getRankingRaw(matches, uids)
     return {k: v for k, v in zip(uids, prank_r)}
+
+
+def getBestWorst(matches, uid):
+
+    uids = getAllUids(matches)
+
+    s1, s2, t1, t2, gw, prank, loglterms, logl, gradf = getModel()
+    # Bit fiddly calling this again
+    s1_r, s2_r, t1_r, t2_r, gw_r = buildMatrices(matches, uids)
+
+    prank_r = getRankingRaw(matches, uids)
+
+    res = []
+    for i, m in enumerate(matches):
+        for p in m.players1 + m.players2:
+            if p == uid:
+                shift = -gradf.eval({gw: [gw_r[i]], s1: [s1_r[i]], s2: [s2_r[i]], t1: [t1_r[i]], t2: [t2_r[i]], prank: prank_r})[uids.index(uid)]
+                print shift, m.players1, m.players2
+                res.append((shift, m))
+
+    return sorted(res, key=lambda x: x[0])
