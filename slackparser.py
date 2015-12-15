@@ -93,22 +93,45 @@ def mangleit(x, iseq):
     return "%i%s %s" % (x[0], c, x[1])
 
 
-def formatRanking(slack, d, mc):
+def formatRanking(slack, d, mc, lastg):
+    # print badr
     r = []
     l = 1e6
     c = 0
     tc = 0
     iseq = []
 
-    notyet = []
+    bad_neg = []
+    bad_cov = []
 
     allusers = slack.users.list().body
+
+    now = datetime.datetime.now()
+    daysall = datetime.timedelta(days=30)
+    days10 = datetime.timedelta(days=7)
 
     if not 'ok' in allusers:
         raise Exception("Couldn't get users...")
 
     for n in sorted(d.items(), key=lambda x: x[1], reverse=True):
         name = getNiceName(allusers, n[0])
+
+        timediff = now - lastg[n[0]]
+
+        if mc[n[0]] < 3:
+            bad_neg.append(name)
+            continue
+        elif mc[n[0]] < 10:
+            if timediff > days10:
+                bad_neg.append(name)
+                continue
+        else:
+            if timediff > daysall:
+                continue
+
+        # if badr[n[0]]:
+            # bad_cov.append(name)
+            # continue
 
         tc += 1
         if n[1] < l - 0.1:
@@ -122,6 +145,12 @@ def formatRanking(slack, d, mc):
         r.append((c, "%s (%s)" % (name, ss)))
 
     r = map(lambda x: mangleit(x, iseq), r)
+
+    if len(bad_neg) > 0:
+        r.append("Needs more games: %s" % (', '.join(bad_neg)))
+
+    if len(bad_cov) > 0:
+        r.append("Needs more varied games: %s" % (', '.join(bad_cov)))
 
     return r
 
@@ -162,15 +191,16 @@ def formatMatch(allusers, m):
 def processRank(slack, args):
     m = loldb.getmatches()
     # d = ranking.getRankings(m)
-    td = theanorank.getRanking(m)
+    td, badr = theanorank.getRanking(m)
     # print d
     print td
     mc = loldb.getgamecounts()
-    out = formatRanking(slack, td, mc)
-    legstr = ''
-    if numpy.min(mc.values()) < 3:
-        legstr = '\n* has played less than 3 games'
-    return simpleResp('```' + '\n'.join(out) + legstr + '```')
+    lastg = loldb.getlastgameall()
+    out = formatRanking(slack, td, mc, lastg)
+    # legstr = ''
+    # if numpy.min(mc.values()) < 3:
+    #     legstr = '\n* has played less than 3 games'
+    return simpleResp('```' + '\n'.join(out) + '```')
 
 
 def processDelete(args):
@@ -204,7 +234,7 @@ def processStats(slack, args, user):
     m = loldb.getmatches()
     mc = loldb.getgamecounts()[uid]
     lg = loldb.getlastgame(uid)
-    td = theanorank.getRanking(m)
+    td, badr = theanorank.getRanking(m)
     bw = theanorank.getBestWorst(m, uid)
 
     nn = getNiceName(allusers, uid)
@@ -228,7 +258,7 @@ def processStats(slack, args, user):
 
 def processPredict(args):
     m = loldb.getmatches()
-    d = theanorank.getRanking(m)
+    d, badr = theanorank.getRanking(m)
 
     players1 = []
     while len(args) > 0 and args[0].startswith('<@'):

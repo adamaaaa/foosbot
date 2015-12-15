@@ -1,5 +1,5 @@
 from theano import tensor as T
-# import theano
+import theano
 import datetime
 import math
 import numpy
@@ -22,8 +22,9 @@ def _getModel():
     logl = -T.sum(loglterms)
 
     gradf = T.grad(logl, prank)
+    hessf = theano.gradient.hessian(logl, prank)
 
-    return s1, s2, t1, t2, gw, prank, loglterms, logl, gradf
+    return s1, s2, t1, t2, gw, prank, loglterms, logl, gradf, hessf
 
 
 _modelcache = None
@@ -70,7 +71,7 @@ def buildMatrices(matches, uids):
 
 def getRankingRaw(matches, uids):
 
-    s1, s2, t1, t2, gw, prank, loglterms, logl, gradf = getModel()
+    s1, s2, t1, t2, gw, prank, loglterms, logl, gradf, hessf = getModel()
 
     s1_r, s2_r, t1_r, t2_r, gw_r = buildMatrices(matches, uids)
 
@@ -93,25 +94,42 @@ def getRankingRaw(matches, uids):
         if i % 100 == 0:
             print i, prank_r[:2], prev[:2], score, alpha
 
-    return prank_r
+    print "Evaluating Hessian"
+    hessm = hessf.eval({gw: gw_r, s1: s1_r, s2: s2_r, t1: t1_r, t2: t2_r, prank: prank_r})
+    badr = getBadRankings(hessm)
+
+    return prank_r, badr
 
 
 def getRanking(matches):
 
     uids = getAllUids(matches)
-    prank_r = getRankingRaw(matches, uids)
-    return {k: v for k, v in zip(uids, prank_r)}
+    prank_r, badr = getRankingRaw(matches, uids)
+    # This isn't a great line of code, probably improve the whole API for getting rankings?
+    return {k: v for k, v in zip(uids, prank_r)}, {k: v for k, v in zip(uids, badr)}
+
+
+def getBadRankings(hessm):
+    covm = numpy.linalg.pinv(hessm)
+
+    def getoffdiag(i, x):
+        x[i] = 0
+        return numpy.max(numpy.abs(x))
+
+    print map(lambda x: getoffdiag(x[0], x[1]) > 1.0, enumerate(covm))
+
+    return map(lambda x: getoffdiag(x[0], x[1]) > 1.0, enumerate(covm))
 
 
 def getBestWorst(matches, uid):
 
     uids = getAllUids(matches)
 
-    s1, s2, t1, t2, gw, prank, loglterms, logl, gradf = getModel()
+    s1, s2, t1, t2, gw, prank, loglterms, logl, gradf, hessf = getModel()
     # Bit fiddly calling this again
     s1_r, s2_r, t1_r, t2_r, gw_r = buildMatrices(matches, uids)
 
-    prank_r = getRankingRaw(matches, uids)
+    prank_r, badr = getRankingRaw(matches, uids)
 
     res = []
     for i, m in enumerate(matches):

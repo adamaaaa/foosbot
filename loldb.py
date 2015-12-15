@@ -2,6 +2,7 @@ import pickle
 import ranking
 import numpy
 import collections
+import datetime
 
 
 _dbfile = 'foosdb.pickle'
@@ -58,6 +59,16 @@ def getlastgame(uid):
         if uid in m.players1 + m.players2:
             times.append(m)
     return sorted(times, key=lambda x: x.when)[-1]
+
+
+def getlastgameall():
+    matches = getmatches()
+    latest = collections.defaultdict(lambda: datetime.datetime(1900, 1, 1))
+    for m in matches:
+        for uid in m.players1 + m.players2:
+            if m.when > latest[uid]:
+                latest[uid] = m.when
+    return latest
 
 
 def _newid():
