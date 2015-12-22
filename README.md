@@ -39,3 +39,9 @@ which once you've played enough games will return something like:
 
     1. steve (3.4)
     2. john (-3.4)
+
+# Ranking Model
+
+Technically the ranking algorithm assumes that a foosball game is a series of Bernoulli trials, with a probability determined by the difference in skill between two players. Given a set of matches, it tries to find a set of skill ratings for all players involved which maximises the likelihood of the observed results. To make the minimisation fast this is done with Stochastic Gradient Descent implemented with Theano.
+
+To increase the quality of the rankings, players are required to have played at least 3 games before they are ranked. Old players are removed after a grace period of 30 days, or 7 days if they have less than 10 games recorded.
