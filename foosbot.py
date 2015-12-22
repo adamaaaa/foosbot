@@ -16,6 +16,16 @@ config = yaml.load(open('config.yaml'))
 slack = slacker.Slacker(config['slacktoken'])
 
 
+def getniceuser(users, n):
+    uc = filter(lambda x: x['name'] == n, users)
+    if len(uc) != 1:
+        print "Unable to find user %s in slack, please check your config" % (config['adminuser'])
+        sys.exit(1)
+    else:
+        print "User %s found with id %s" % (n, uc[0]['id'])
+        return uc[0]['id']
+
+
 def mangleconfig(config):
     # Sort out friendly names in config
     chans = slack.channels.list().body['channels']
@@ -28,13 +38,8 @@ def mangleconfig(config):
         config['fooschan'] = cc[0]['id']
 
     users = slack.users.list().body['members']
-    uc = filter(lambda x: x['name'] == config['adminuser'], users)
-    if len(uc) != 1:
-        print "Unable to find user %s in slack, please check your config" % (config['adminuser'])
-        sys.exit(1)
-    else:
-        print "Admin user %s found with id %s" % (config['adminuser'], uc[0]['id'])
-        config['adminuser'] = uc[0]['id']
+    config['adminuser'] = getniceuser(users, config['adminuser'])
+    config['botuser'] = getniceuser(users, config['botuser'])
 
 
 def onrecv(ws, message):

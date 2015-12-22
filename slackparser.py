@@ -349,7 +349,7 @@ def processMessage(slack, config, _msg):
 
         # print text
 
-        if not text.startswith('<@U0BCNAB3P>'):
+        if not text.startswith('<@%s>' % config['botuser']):
             return []
 
         ctext = text.partition(' ')[2]

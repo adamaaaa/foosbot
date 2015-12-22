@@ -18,6 +18,7 @@ Then you need to create a config file called config.yaml in the location where y
     slacktoken: <API token generated from https://api.slack.com/web>
     fooschan: <channel name where you want bot to run>
     adminuser: <your slack username>
+    botuser: <a bot username set up in slack integrations>
 
 Then just run ./foosbot.py
 
