@@ -92,33 +92,33 @@ def getRankingRaw(matches, uids):
                 break
             last = score
         if i % 100 == 0:
-            print i, prank_r[:2], prev[:2], score, alpha
+            print "SGD step %i, logl %f, alpha %f" % (i, score, alpha)
 
-    print "Evaluating Hessian"
-    hessm = hessf.eval({gw: gw_r, s1: s1_r, s2: s2_r, t1: t1_r, t2: t2_r, prank: prank_r})
-    badr = getBadRankings(hessm)
+    # print "Evaluating Hessian"
+    # hessm = hessf.eval({gw: gw_r, s1: s1_r, s2: s2_r, t1: t1_r, t2: t2_r, prank: prank_r})
+    # badr = getBadRankings(hessm)
 
-    return prank_r, badr
+    return prank_r
 
 
 def getRanking(matches):
 
     uids = getAllUids(matches)
-    prank_r, badr = getRankingRaw(matches, uids)
+    prank_r = getRankingRaw(matches, uids)
     # This isn't a great line of code, probably improve the whole API for getting rankings?
-    return {k: v for k, v in zip(uids, prank_r)}, {k: v for k, v in zip(uids, badr)}
+    return {k: v for k, v in zip(uids, prank_r)}
 
 
-def getBadRankings(hessm):
-    covm = numpy.linalg.pinv(hessm)
+# def getBadRankings(hessm):
+#     covm = numpy.linalg.pinv(hessm)
 
-    def getoffdiag(i, x):
-        x[i] = 0
-        return numpy.max(numpy.abs(x))
+#     def getoffdiag(i, x):
+#         x[i] = 0
+#         return numpy.max(numpy.abs(x))
 
-    print map(lambda x: getoffdiag(x[0], x[1]) > 1.0, enumerate(covm))
+#     print map(lambda x: getoffdiag(x[0], x[1]) > 1.0, enumerate(covm))
 
-    return map(lambda x: getoffdiag(x[0], x[1]) > 1.0, enumerate(covm))
+#     return map(lambda x: getoffdiag(x[0], x[1]) > 1.0, enumerate(covm))
 
 
 def getBestWorst(matches, uid):

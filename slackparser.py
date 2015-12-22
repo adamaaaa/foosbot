@@ -9,14 +9,12 @@ import ranking
 import theanorank
 
 
-_fooschan = 'C0BCN8XD4'
-_adminuser = 'U02AYNXND'
 _nextid = 1
 
 
 def simpleMsg(text):
     global _nextid
-    m = {'type': 'message', 'channel': _fooschan, 'id': _nextid, 'text': text}
+    m = {'type': 'message', 'id': _nextid, 'text': text}
     _nextid += 1
     return m
 
@@ -113,8 +111,10 @@ def formatRanking(slack, d, mc, lastg):
     if not 'ok' in allusers:
         raise Exception("Couldn't get users...")
 
+    spb = lambda x: unicode(x[0]) + u'\u200B' + unicode(x[1:])
+
     for n in sorted(d.items(), key=lambda x: x[1], reverse=True):
-        name = getNiceName(allusers, n[0])
+        name = spb(getNiceName(allusers, n[0]))
 
         timediff = now - lastg[n[0]]
 
@@ -191,9 +191,9 @@ def formatMatch(allusers, m):
 def processRank(slack, args):
     m = loldb.getmatches()
     # d = ranking.getRankings(m)
-    td, badr = theanorank.getRanking(m)
+    td = theanorank.getRanking(m)
     # print d
-    print td
+    # print td
     mc = loldb.getgamecounts()
     lastg = loldb.getlastgameall()
     out = formatRanking(slack, td, mc, lastg)
@@ -234,7 +234,7 @@ def processStats(slack, args, user):
     m = loldb.getmatches()
     mc = loldb.getgamecounts()[uid]
     lg = loldb.getlastgame(uid)
-    td, badr = theanorank.getRanking(m)
+    td = theanorank.getRanking(m)
     bw = theanorank.getBestWorst(m, uid)
 
     nn = getNiceName(allusers, uid)
@@ -258,7 +258,7 @@ def processStats(slack, args, user):
 
 def processPredict(args):
     m = loldb.getmatches()
-    d, badr = theanorank.getRanking(m)
+    d = theanorank.getRanking(m)
 
     players1 = []
     while len(args) > 0 and args[0].startswith('<@'):
@@ -315,9 +315,11 @@ def processHelp(args):
             return simpleResp("Sorry, I don't know about %s" % args[0])
 
 
-def processMessage(slack, _msg):
+def processMessage(slack, config, _msg):
     try:
 
+        _fooschan = config['fooschan']
+        _adminuser = config['fooschan']
         # print "PROCESSING"
         # print type(_msg)
         msg = json.loads(_msg)
@@ -333,7 +335,7 @@ def processMessage(slack, _msg):
             # print "NOTCHAN"
             return []
 
-        print "INCHANNEL"
+        # print "INCHANNEL"
 
         if not 'text' in msg:
             print "Ignoring possible edit?"
@@ -345,7 +347,7 @@ def processMessage(slack, _msg):
         if 'user' in msg:
             user = msg['user']
 
-        print text
+        # print text
 
         if not text.startswith('<@U0BCNAB3P>'):
             return []
