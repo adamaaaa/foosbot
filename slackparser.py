@@ -319,7 +319,7 @@ def processMessage(slack, config, _msg):
     try:
 
         _fooschan = config['fooschan']
-        _adminuser = config['fooschan']
+        _adminuser = config['adminuser']
         # print "PROCESSING"
         # print type(_msg)
         msg = json.loads(_msg)

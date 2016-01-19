@@ -129,7 +129,7 @@ def getBestWorst(matches, uid):
     # Bit fiddly calling this again
     s1_r, s2_r, t1_r, t2_r, gw_r = buildMatrices(matches, uids)
 
-    prank_r, badr = getRankingRaw(matches, uids)
+    prank_r = getRankingRaw(matches, uids)
 
     res = []
     for i, m in enumerate(matches):
